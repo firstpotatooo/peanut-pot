@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>Proto 永續工廠 - 3D 體驗版</title>
+    <style>
+        body { font-family: 'PingFang TC', sans-serif; text-align: center; background: #fdfaf6; color: #5a4a42; margin: 0; padding: 10px; }
+        .connect-box { background: #f1e9db; padding: 10px; border-radius: 8px; display: inline-block; margin-bottom: 10px; z-index: 10; position: relative; }
+        #game-stage { max-width: 800px; margin: 0 auto; background: white; border: 4px solid #e6dfd3; border-radius: 16px; padding: 20px; position: relative; }
+        .step-banner { font-size: 22px; font-weight: bold; color: #d97706; background: #fef3c7; padding: 8px 20px; border-radius: 30px; display: inline-block; }
+        
+        /* 3D 畫布容器 */
+        #canvas-container { width: 100%; height: 300px; background: #eee; border-radius: 8px; margin: 10px 0; border: 2px solid #ddd; overflow: hidden; }
+        
+        /* 進度條 */
+        .bar-container { width: 80%; height: 26px; background: #eee; border-radius: 13px; margin: 15px auto; overflow: hidden; border: 2px solid #ddd; position: relative; display: none; }
+        .progress-bar { height: 100%; width: 0%; background: #8ac926; }
+        .perfect-zone { position: absolute; left: 70%; width: 15%; height: 100%; background: rgba(255, 215, 0, 0.5); border-left: 2px dashed #ffb703; border-right: 2px dashed #ffb703; }
+        
+        .hint-text { font-size: 18px; color: #4b5563; font-weight: bold; min-height: 28px; }
+        .status-board { font-size: 20px; font-weight: bold; color: #16a34a; margin-top: 10px; }
+        .streak-badge { display: inline-block; padding: 5px 15px; background: #dcfce7; color: #15803d; border-radius: 15px; font-size: 16px; margin-left: 10px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <h1>Proto 永續工廠 🌾 (3D 免滑鼠版)</h1>
+
+    <div class="connect-box">
+        狀態：<span id="connection-status" style="color:red; font-weight:bold;">未連線</span> | 
+        IP：<input type="text" id="ipAddress" value="192.168.X.X" style="width:120px;">
+        <button onclick="connectESP32()">連接控制器</button>
+    </div>
+
+    <div id="game-stage">
+        <div id="step-title" class="step-banner">步驟一：材料備料</div>
+        
+        <div id="canvas-container"></div>
+
+        <div id="bar-wrapper" class="bar-container">
+            <div id="perfect-indicator" class="perfect-zone"></div>
+            <div id="loading-bar" class="progress-bar"></div>
+        </div>
+
+        <div id="game-hint" class="hint-text">🔴 請拍擊「大按鈕」5 次，依序倒入石灰、澱粉、花生粉...</div>
+        
+        <div class="status-board">
+            已成功出貨：<span id="pot-count">0</span> 個
+            <span id="streak-box" class="streak-badge" style="display:none;">連續成功: <span id="streak-count">0</span>/3</span>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let currentStep = 1;
+        let totalPots = 0;
+        let successStreak = 0;
+        let stirCount = 0;
+        let stirProgress = 0;
+        let pressProgress = 0;
+        let isPressingActive = false;
+        let dryProgress = 0;
+        let errorTimeout;
+
+        let scene, camera, renderer, mainMesh, pressMesh;
+
+        // 視覺與指示器
+        const titleElement = document.getElementById('step-title');
+        const hintElement = document.getElementById('game-hint');
+        const barWrapper = document.getElementById('bar-wrapper');
+        const loadingBar = document.getElementById('loading-bar');
+        const perfectZone = document.getElementById('perfect-indicator');
+        const streakBox = document.getElementById('streak-box');
+        const streakCount = document.getElementById('streak-count');
+
+        // 確保網頁一打開就顯示 3D 物件
+        init3D();
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            if (scene) return; // 避免重複載入
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf3f4f6);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 5, 8);
+            camera.lookAt(0, 1, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionLight(0xffffff, 0.6);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+
+            // 圓柱主體
+            const geometry = new THREE.CylinderGeometry(1.5, 1.2, 1, 32);
+            const material = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+            mainMesh = new THREE.Mesh(geometry, material);
+            mainMesh.position.y = 0.5;
+            mainMesh.scale.y = 0.1; // 預設第一關是矮的
+            scene.add(mainMesh);
+
+            // 壓頭
+            const pressGeo = new THREE.CylinderGeometry(1.4, 1.4, 0.5, 32);
+            const pressMat = new THREE.MeshStandardMaterial({ color: 0x92400e });
+            pressMesh = new THREE.Mesh(pressGeo, pressMat);
+            pressMesh.position.set(0, 4, 0); // 懸空
+            pressMesh.visible = false; // 預設第一關隱藏
+            scene.add(pressMesh);
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        function connectESP32() {
+            const ip = document.getElementById('ipAddress').value;
+            document.getElementById('connection-status').innerText = "連線中...";
+            ws = new WebSocket(`ws://${ip}:81`);
+
+            ws.onopen = () => {
+                document.getElementById('connection-status').innerText = "已連線";
+                document.getElementById('connection-status').style.color = "green";
+                toStep1();
+            };
+
+            ws.onclose = () => {
+                document.getElementById('connection-status').innerText = "斷開";
+                document.getElementById('connection-status').style.color = "red";
+                currentStep = 0;
+                titleElement.innerText = "連線已中斷";
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleHardwareInput(data);
+            };
+        }
+
+        function handleHardwareInput(data) {
+            const isJoystickMoving = (Math.abs(data.x - 2048) > 1000 || Math.abs(data.y - 2048) > 1000);
+            const isJoystickPushing = (data.y > 3500);
+            const isBigButtonPressed = (data.btn === 1);
+            const isJoystickClicked = (data.sw === 1);
+
+            switch(currentStep) {
+                case 1:
+                    if (isBigButtonPressed && !isBigButtonHolding) {
+                        isBigButtonHolding = true;
+                        stirCount += 1;
+                        mainMesh.scale.y = 0.2 + (stirCount * 0.2);
+                        mainMesh.material.color.setHex(0xeab308); 
+                        hintElement.innerText = `已倒入材料: ${stirCount} / 5`;
+                        if (stirCount >= 5) toStep2();
+                    }
+                    if (!isBigButtonPressed) isBigButtonHolding = false;
+                    break;
+
+                case 2:
+                    if (isJoystickMoving) {
+                        stirProgress += 2;
+                        mainMesh.rotation.y += 0.2;
+                        loadingBar.style.width = `${stirProgress}%`;
+                        hintElement.innerText = "攪拌中...材料正在混勻！";
+                        if (stirProgress >= 100) toStep3();
+                    } else {
+                        hintElement.innerText = "🔄 請「旋轉搖桿」將材料攪拌成團！";
+                    }
+                    break;
+
+                case 3:
+                    if (isJoystickPushing) {
+                        if(!isPressingActive) {
+                            isPressingActive = true;
+                            pressInterval = setInterval(() => {
+                                pressProgress += 2.5;
+                                loadingBar.style.width = `${pressProgress}%`;
+                                pressMesh.position.y = 4 - (pressProgress * 0.03);
+                                if(pressProgress >= 100) {
+                                    clearInterval(pressInterval);
+                                    handlePressFailure("壓力過大！結構爆裂！");
+                                }
+                            }, 40);
+                        }
+                    } else {
+                        if (pressProgress > 0) {
+                            clearInterval(pressInterval);
+                            isPressingActive = false;
+                            if (pressProgress >= 70 && pressProgress <= 85) {
+                                successStreak += 1;
+                                streakCount.innerText = successStreak;
+                                if (successStreak >= 3) toStep4();
+                                else {
+                                    hintElement.innerText = `✨ 第 ${successStreak} 次成功！放開，再下壓一次！`;
+                                    pressProgress = 0; loadingBar.style.width = "0%"; pressMesh.position.y = 4;
+                                }
+                            } else handlePressFailure(pressProgress < 70 ? "太鬆了，結構散落！" : "結構擠壓變形！");
+                        }
+                    }
+                    break;
+
+                case 4:
+                    if (isJoystickPushing) {
+                        hintElement.innerText = "♨️ 烘乾箱運作中，請握緊搖桿維持溫度...";
+                        dryProgress += 1;
+                        loadingBar.style.width = `${dryProgress}%`;
+                        mainMesh.material.color.setHex(0x78350f);
+                        if (dryProgress >= 100) toStep5();
+                    } else {
+                        if (dryProgress > 0) {
+                            dryProgress = 0; loadingBar.style.width = "0%"; hintElement.innerText = "❌ 烘乾中斷！請重新按住！";
+                        }
+                    }
+                    break;
+
+                case 5:
+                    if (isBigButtonPressed) {
+                        pressMesh.position.y = 6; mainMesh.position.y = 2; toStep6();
+                    }
+                    break;
+
+                case 6:
+                    if (isJoystickClicked) {
+                        mainMesh.material.color.setHex(0x22c55e); totalPots += 1; document.getElementById('pot-count').innerText = totalPots; toStep7Success();
+                    }
+                    break;
+
+                case 7:
+                    if (isBigButtonPressed) toStep1();
+                    break;
+            }
+        };
+
+        function handlePressFailure(reason) {
+            currentStep = 7; successStreak = 0; barWrapper.style.display = "none";
+            pressMesh.position.y = 4; mainMesh.material.color.setHex(0xef4444);
+            hintElement.innerText = `💥 ${reason} 🔴 請拍擊「大按鈕」重新備料。`; titleElement.innerText = "製程失敗！";
+        }
+
+        let isBigButtonHolding = false;
+        function toStep1() {
+            currentStep = 1; stirCount = 0; successStreak = 0;
+            titleElement.innerText = "步驟一：材料備料"; hintElement.innerText = "🔴 請拍擊「大按鈕」5 次倒入材料...";
+            mainMesh.position.set(0, 0.5, 0); mainMesh.scale.y = 0.1;
+            mainMesh.material.color.setHex(0xdddddd); pressMesh.position.y = 4; pressMesh.visible = false;
+            barWrapper.style.display = "none"; streakBox.style.display = "none";
+        }
+        function toStep2() { currentStep = 2; stirProgress = 0; titleElement.innerText = "步驟二：手動攪拌"; barWrapper.style.display = "block"; perfectZone.style.display = "none"; }
+        function toStep3() { currentStep = 3; pressProgress = 0; titleElement.innerText = "步驟三：填壓模具 (需連續成功3次)"; hintElement.innerText = "⬇️ 向下推住搖桿！在黃色區域放開！"; pressMesh.visible = true; perfectZone.style.display = "block"; streakBox.style.display = "inline-block"; streakCount.innerText = successStreak; }
+        function toStep4() { currentStep = 4; dryProgress = 0; titleElement.innerText = "步驟四：低溫烘乾箱"; perfectZone.style.display = "none"; }
+        function toStep5() { currentStep = 5; titleElement.innerText = "步驟五：模具脫模出貨"; hintElement.innerText = "🔴 烘乾完成！請拍擊「大按鈕」進行脫模！"; barWrapper.style.display = "none"; }
+        function toStep6() { currentStep = 6; titleElement.innerText = "步驟六：澆水種植"; hintElement.innerText = "🕹️ 請「垂直按下搖桿(BOOT鍵)」為盆器澆水發芽！"; }
+        function toStep7Success() { currentStep = 7; titleElement.innerText = "🎉 盆器培育成功！"; hintElement.innerText = "🔴 請拍擊「大按鈕」開啟下一輪！"; }
+    </script>
+</body>
+</html>
