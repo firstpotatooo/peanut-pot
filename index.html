@@ -2,70 +2,170 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>Proto 永續工廠 - 3D 體驗版</title>
+    <title>K-Pot 永續工廠 - 展場互動控制台</title>
     <style>
-        body { font-family: 'PingFang TC', sans-serif; text-align: center; background: #fdfaf6; color: #5a4a42; margin: 0; padding: 10px; }
-        .connect-box { background: #f1e9db; padding: 10px; border-radius: 8px; display: inline-block; margin-bottom: 10px; z-index: 10; position: relative; }
-        #game-stage { max-width: 800px; margin: 0 auto; background: white; border: 4px solid #e6dfd3; border-radius: 16px; padding: 20px; position: relative; }
-        .step-banner { font-size: 22px; font-weight: bold; color: #d97706; background: #fef3c7; padding: 8px 20px; border-radius: 30px; display: inline-block; }
+        body { 
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
+            text-align: center; 
+            background-color: #fdfaf6; 
+            color: #5a4a42; 
+            margin: 0; 
+            padding: 20px;
+        }
+        .connect-box { 
+            background: #f1e9db; 
+            padding: 12px 20px; 
+            border-radius: 12px; 
+            display: inline-block; 
+            margin-bottom: 20px; 
+            font-weight: 500;
+        }
+        input { padding: 8px; border: 1px solid #c8b79d; border-radius: 6px; width: 130px; }
+        button { 
+            padding: 8px 16px; 
+            background: #8b5a2b; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        #game-stage { 
+            max-width: 650px; 
+            margin: 0 auto; 
+            background: white; 
+            border: 4px solid #e6dfd3; 
+            border-radius: 24px; 
+            padding: 30px; 
+            box-shadow: 0 15px 35px rgba(139, 90, 43, 0.1); 
+        }
+        .step-banner { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #d97706; 
+            background: #fef3c7; 
+            padding: 10px 25px; 
+            border-radius: 50px; 
+            display: inline-block; 
+            margin-bottom: 15px; 
+        }
         
-        /* 3D 畫布容器 */
-        #canvas-container { width: 100%; height: 300px; background: #eee; border-radius: 8px; margin: 10px 0; border: 2px solid #ddd; overflow: hidden; }
-        
-        /* 進度條 */
-        .bar-container { width: 80%; height: 26px; background: #eee; border-radius: 13px; margin: 15px auto; overflow: hidden; border: 2px solid #ddd; position: relative; display: none; }
-        .progress-bar { height: 100%; width: 0%; background: #8ac926; }
-        .perfect-zone { position: absolute; left: 70%; width: 15%; height: 100%; background: rgba(255, 215, 0, 0.5); border-left: 2px dashed #ffb703; border-right: 2px dashed #ffb703; }
-        
-        .hint-text { font-size: 18px; color: #4b5563; font-weight: bold; min-height: 28px; }
-        .status-board { font-size: 20px; font-weight: bold; color: #16a34a; margin-top: 10px; }
-        .streak-badge { display: inline-block; padding: 5px 15px; background: #dcfce7; color: #15803d; border-radius: 15px; font-size: 16px; margin-left: 10px; }
+        #visual-container { 
+            width: 100%; 
+            height: 400px; 
+            background-color: #f8f9fa; 
+            border-radius: 16px; 
+            margin: 20px 0; 
+            border: 1px solid #eee;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #factory-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            position: absolute;
+            top: 0; left: 0; z-index: 1;
+        }
+        #factory-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            position: absolute;
+            top: 0; left: 0; z-index: 2;
+        }
+
+        .bar-container { 
+            width: 85%; 
+            height: 28px; 
+            background: #f1f1f1; 
+            border-radius: 14px; 
+            margin: 20px auto; 
+            overflow: hidden; 
+            border: 2px solid #e2e8f0; 
+            position: relative; 
+            display: none; 
+        }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #8ac926, #4caf50); }
+        .perfect-zone { position: absolute; left: 70%; width: 8%; height: 100%; background: rgba(255, 215, 0, 0.6); border-left: 2px dashed #ffb703; border-right: 2px dashed #ffb703; display: none; }
+        .hint-text { font-size: 19px; color: #4b5563; font-weight: 600; min-height: 54px; margin: 15px 0; line-height: 1.4; }
+        .status-board { font-size: 22px; font-weight: bold; color: #16a34a; margin-top: 15px; }
+        .streak-badge { display: inline-block; padding: 6px 18px; background: #dcfce7; color: #15803d; border-radius: 20px; font-size: 16px; margin-left: 12px; border: 1px solid #bcf0da; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <h1>Proto 永續工廠 🌾 (3D 免滑鼠版)</h1>
+    <div style="text-align: center; margin: 20px auto 30px;">
+        <img src="images/k-pot_logo.png" alt="K-Pot Logo" style="height: 96px; width: auto;" onerror="this.src='https://placehold.co/240x96/8b5a2b/fdfaf6?text=K-POT+LOGO'">
+    </div>
 
     <div class="connect-box">
-        狀態：<span id="connection-status" style="color:red; font-weight:bold;">未連線</span> | 
-        IP：<input type="text" id="ipAddress" value="192.168.X.X" style="width:120px;">
+        狀態：<span id="connection-status" style="color:#ef4444;">未連線</span> | 
+        控制器 IP：<input type="text" id="ipAddress" value="192.168.1.106">
         <button onclick="connectESP32()">連接控制器</button>
     </div>
 
     <div id="game-stage">
-        <div id="step-title" class="step-banner">步驟一：材料備料</div>
+        <div id="step-title" class="step-banner">準備開工</div>
         
-        <div id="canvas-container"></div>
+        <div id="visual-container">
+            <video id="factory-video" muted playsinline></video>
+            <img id="factory-image" src="images/exhibition_cover.png" alt="工廠視覺">
+        </div>
 
         <div id="bar-wrapper" class="bar-container">
             <div id="perfect-indicator" class="perfect-zone"></div>
             <div id="loading-bar" class="progress-bar"></div>
         </div>
 
-        <div id="game-hint" class="hint-text">🔴 請拍擊「大按鈕」5 次，依序倒入石灰、澱粉、花生粉...</div>
+        <div id="game-hint" class="hint-text">歡迎來到 K-Pot 永續工廠！請點擊上方「連接控制器」開始體驗。</div>
         
         <div class="status-board">
             已成功出貨：<span id="pot-count">0</span> 個
-            <span id="streak-box" class="streak-badge" style="display:none;">連續成功: <span id="streak-count">0</span>/3</span>
+            <span id="streak-box" class="streak-badge" style="display:none;">填壓連勝: <span id="streak-count">0</span>/3</span>
         </div>
     </div>
 
-    <script>
+    <script {copy}>
         let ws;
-        let currentStep = 1;
+        let currentStep = 0; 
         let totalPots = 0;
-        let successStreak = 0;
-        let stirCount = 0;
+        let successStreak = 0; 
+        let materialCount = 0;
         let stirProgress = 0;
         let pressProgress = 0;
         let isPressingActive = false;
+        let pressInterval;
         let dryProgress = 0;
-        let errorTimeout;
+        let isBigButtonHolding = false;
 
-        let scene, camera, renderer, mainMesh, pressMesh;
+        let isEjectVideoFinished = false; 
 
-        // 視覺與指示器
+        let holdResetProgress = 0;
+        let holdResetInterval = null;
+
+        let zoneLeftPosition = 60; 
+        let swingAngle = 0;
+        const swingSpeed = 0.04; 
+
+        let lastQuadrant = 0;
+        let lastCircleTime = Date.now();
+
+        const step1Images = [
+            "images/step1_1.png",
+            "images/step1_2.png",
+            "images/step1_3.png",
+            "images/step1_4.png",
+            "images/step1_5.png"
+        ];
+
+        const factoryVideo = document.getElementById('factory-video');
+        const factoryImage = document.getElementById('factory-image');
         const titleElement = document.getElementById('step-title');
         const hintElement = document.getElementById('game-hint');
         const barWrapper = document.getElementById('bar-wrapper');
@@ -74,72 +174,40 @@
         const streakBox = document.getElementById('streak-box');
         const streakCount = document.getElementById('streak-count');
 
-        // 確保網頁一打開就顯示 3D 物件
-        init3D();
-
-        function init3D() {
-            const container = document.getElementById('canvas-container');
-            if (scene) return; // 避免重複載入
-
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf3f4f6);
-
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(0, 5, 8);
-            camera.lookAt(0, 1, 0);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            container.appendChild(renderer.domElement);
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-            scene.add(ambientLight);
-            const dirLight = new THREE.DirectionLight(0xffffff, 0.6);
-            dirLight.position.set(5, 10, 7);
-            scene.add(dirLight);
-
-            // 圓柱主體
-            const geometry = new THREE.CylinderGeometry(1.5, 1.2, 1, 32);
-            const material = new THREE.MeshStandardMaterial({ color: 0xdddddd });
-            mainMesh = new THREE.Mesh(geometry, material);
-            mainMesh.position.y = 0.5;
-            mainMesh.scale.y = 0.1; // 預設第一關是矮的
-            scene.add(mainMesh);
-
-            // 壓頭
-            const pressGeo = new THREE.CylinderGeometry(1.4, 1.4, 0.5, 32);
-            const pressMat = new THREE.MeshStandardMaterial({ color: 0x92400e });
-            pressMesh = new THREE.Mesh(pressGeo, pressMat);
-            pressMesh.position.set(0, 4, 0); // 懸空
-            pressMesh.visible = false; // 預設第一關隱藏
-            scene.add(pressMesh);
-
-            animate();
+        function updateAnimationLoop() {
+            if (currentStep === 3) {
+                swingAngle += swingSpeed;
+                zoneLeftPosition = 60 + Math.sin(swingAngle) * 25; 
+                perfectZone.style.left = zoneLeftPosition + '%';
+            }
+            requestAnimationFrame(updateAnimationLoop);
         }
+        requestAnimationFrame(updateAnimationLoop);
 
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
+        factoryVideo.onended = () => {
+            if (currentStep === 5) {
+                isEjectVideoFinished = true; 
+                hintElement.innerText = "脫模動畫完成！請拍擊實體黑色大按鈕完成物理出貨。";
+            }
+        };
 
         function connectESP32() {
             const ip = document.getElementById('ipAddress').value;
             document.getElementById('connection-status').innerText = "連線中...";
             ws = new WebSocket(`ws://${ip}:81`);
-
             ws.onopen = () => {
                 document.getElementById('connection-status').innerText = "已連線";
-                document.getElementById('connection-status').style.color = "green";
-                toStep1();
+                document.getElementById('connection-status').style.color = "#16a34a";
+                toStep1(); 
             };
-
             ws.onclose = () => {
-                document.getElementById('connection-status').innerText = "斷開";
-                document.getElementById('connection-status').style.color = "red";
+                document.getElementById('connection-status').innerText = "未連線";
+                document.getElementById('connection-status').style.color = "#ef4444";
                 currentStep = 0;
-                titleElement.innerText = "連線已中斷";
+                showImage("images/exhibition_cover.png");
+                titleElement.innerText = "準備開工";
+                hintElement.innerText = "連線中斷！請檢查硬體 Wi-Fi 與 IP 後重新連接。";
             };
-
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 handleHardwareInput(data);
@@ -147,119 +215,295 @@
         }
 
         function handleHardwareInput(data) {
-            const isJoystickMoving = (Math.abs(data.x - 2048) > 1000 || Math.abs(data.y - 2048) > 1000);
-            const isJoystickPushing = (data.y > 3500);
-            const isBigButtonPressed = (data.btn === 1);
-            const isJoystickClicked = (data.sw === 1);
+            const dx = data.x - 2048;
+            const dy = data.y - 2048;
+            const isJoystickMoving = (Math.abs(dx) > 1200 || Math.abs(dy) > 1200);
+            const isJoystickPushing = (data.y > 3500); 
+            const isBigButtonPressed = (data.btn === 1); 
 
             switch(currentStep) {
-                case 1:
+                case -1: 
+                    if (isBigButtonPressed) {
+                        toStep1();
+                    }
+                    break;
+
+                case 1: // 【1. 備料（防連擊爆圖限制版）】
                     if (isBigButtonPressed && !isBigButtonHolding) {
                         isBigButtonHolding = true;
-                        stirCount += 1;
-                        mainMesh.scale.y = 0.2 + (stirCount * 0.2);
-                        mainMesh.material.color.setHex(0xeab308); 
-                        hintElement.innerText = `已倒入材料: ${stirCount} / 5`;
-                        if (stirCount >= 5) toStep2();
+                        
+                        // 🌟 核心修正：如果點擊次數小於圖片總數，就正常切圖更新
+                        if (materialCount < 5) {
+                            showImage(step1Images[materialCount]);
+                            
+                            if (materialCount === 0) hintElement.innerText = "已倒入材料 (1/5)：【花生殼粉】";
+                            else if (materialCount === 1) hintElement.innerText = "已倒入材料 (2/5)：【少許天然黏著劑】";
+                            else if (materialCount === 2) hintElement.innerText = "已倒入材料 (3/5)：【些許石灰】";
+                            else if (materialCount === 3) hintElement.innerText = "製程動作 (4/5)：【將石灰混入花生殼粉中】";
+                            else if (materialCount === 4) hintElement.innerText = "製程動作 (5/5)：【將天然黏著劑混入花生殼粉中】\n製程準備完畢，請動手轉動搖桿開啟攪拌製程。";
+                            
+                            materialCount += 1;
+                        } else {
+                            // 🌟 就算觀眾再怎麼大力連按，文字跟第 5 張照片依然死鎖定格
+                            hintElement.innerText = "製程動作 (5/5)：【將天然黏著劑混入花生殼粉中】\n製程準備完畢，請動手轉動搖桿開啟攪拌製程。";
+                        }
                     }
                     if (!isBigButtonPressed) isBigButtonHolding = false;
-                    break;
 
-                case 2:
-                    if (isJoystickMoving) {
-                        stirProgress += 2;
-                        mainMesh.rotation.y += 0.2;
-                        loadingBar.style.width = `${stirProgress}%`;
-                        hintElement.innerText = "攪拌中...材料正在混勻！";
-                        if (stirProgress >= 100) toStep3();
-                    } else {
-                        hintElement.innerText = "🔄 請「旋轉搖桿」將材料攪拌成團！";
+                    // 只要點滿 5 下，且玩家真正推動搖桿，就前進步驟二
+                    if (materialCount >= 5 && isJoystickMoving) {
+                        toStep2();
                     }
                     break;
 
-                case 3:
+                case 2: 
+                    if (stirProgress >= 100) {
+                        stirProgress = 100;
+                        loadingBar.style.width = "100%";
+                        factoryVideo.pause(); 
+                        hintElement.innerText = "攪拌完成！請放開搖桿讓機台復位，以進入下一步驟。";
+                        if (!isJoystickMoving) {
+                            toStep3(); 
+                        }
+                        break; 
+                    }
+
+                    if (isJoystickMoving) {
+                        showVideo("videos/step2_stirring.mp4", true);
+                        factoryVideo.play();
+                        
+                        let currentQuadrant = 0;
+                        if (dx >= 0 && dy >= 0) currentQuadrant = 1;
+                        else if (dx >= 0 && dy < 0) currentQuadrant = 2;
+                        else if (dx < 0 && dy < 0) currentQuadrant = 3;
+                        else if (dx < 0 && dy >= 0) currentQuadrant = 4;
+
+                        if (lastQuadrant !== 0 && currentQuadrant !== lastQuadrant) {
+                            if ((currentQuadrant === 2 && lastQuadrant === 1) || 
+                                (currentQuadrant === 3 && lastQuadrant === 2) || 
+                                (currentQuadrant === 4 && lastQuadrant === 3) || 
+                                (currentQuadrant === 1 && lastQuadrant === 4) ||
+                                (currentQuadrant === 4 && lastQuadrant === 1) ||
+                                (currentQuadrant === 3 && lastQuadrant === 4) ||
+                                (currentQuadrant === 2 && lastQuadrant === 3) ||
+                                (currentQuadrant === 1 && lastQuadrant === 2)) {
+                                
+                                let now = Date.now();
+                                let timeElapsed = now - lastCircleTime;
+                                lastCircleTime = now;
+
+                                if (timeElapsed < 80) {
+                                    stirProgress -= 1.5;
+                                    if(stirProgress < 0) stirProgress = 0;
+                                    hintElement.innerText = "警告：攪拌速度過快、粉末飛散！請維持穩定中速繞圈！";
+                                } else if (timeElapsed > 600) {
+                                    hintElement.innerText = "提示：攪拌力道過慢，無法混勻！請稍微加快速率！";
+                                } else {
+                                    stirProgress += 4;
+                                    if(stirProgress > 100) stirProgress = 100;
+                                    hintElement.innerText = "攪拌速度穩定，花生複合材料混勻成團中。";
+                                }
+                                loadingBar.style.width = `${stirProgress}%`;
+                            }
+                        }
+                        lastQuadrant = currentQuadrant;
+                    } else {
+                        factoryVideo.pause(); 
+                        lastQuadrant = 0;
+                        hintElement.innerText = "請手持搖桿進行規律轉圈攪拌，將花生殼與黏著劑混勻。 \n(請勿按壓或推動搖桿以免誤觸失敗)";
+                    }
+                    break;
+
+                case 3: 
                     if (isJoystickPushing) {
                         if(!isPressingActive) {
                             isPressingActive = true;
                             pressInterval = setInterval(() => {
-                                pressProgress += 2.5;
+                                pressProgress += 3.5;
+                                if(pressProgress > 100) pressProgress = 100;
                                 loadingBar.style.width = `${pressProgress}%`;
-                                pressMesh.position.y = 4 - (pressProgress * 0.03);
                                 if(pressProgress >= 100) {
-                                    clearInterval(pressInterval);
-                                    handlePressFailure("壓力過大！結構爆裂！");
+                                    clearInterval(pressInterval); pressInterval = null; isPressingActive = false;
+                                    handlePressFailure("壓力過載！材料應力爆裂！");
                                 }
-                            }, 40);
+                            }, 50);
                         }
                     } else {
-                        if (pressProgress > 0) {
-                            clearInterval(pressInterval);
-                            isPressingActive = false;
-                            if (pressProgress >= 70 && pressProgress <= 85) {
-                                successStreak += 1;
+                        if (pressProgress > 0 && isPressingActive) {
+                            clearInterval(pressInterval); pressInterval = null; isPressingActive = false;
+                            
+                            let minSuccess = zoneLeftPosition;
+                            let maxSuccess = zoneLeftPosition + 8;
+
+                            if (pressProgress >= minSuccess && pressProgress <= maxSuccess) {
+                                successStreak += 1; 
                                 streakCount.innerText = successStreak;
-                                if (successStreak >= 3) toStep4();
-                                else {
-                                    hintElement.innerText = `✨ 第 ${successStreak} 次成功！放開，再下壓一次！`;
-                                    pressProgress = 0; loadingBar.style.width = "0%"; pressMesh.position.y = 4;
+                                if (successStreak >= 3) {
+                                    hintElement.innerText = "連續三次成功！請放開搖桿以進入烘乾箱。";
+                                    if (!isJoystickMoving && !isJoystickPushing) {
+                                        toStep4();
+                                    }
+                                } else {
+                                    pressProgress = 0; 
+                                    loadingBar.style.width = "0%"; 
+                                    hintElement.innerText = `第 ${successStreak} 次成功！放開搖桿，準備再次下壓！`;
                                 }
-                            } else handlePressFailure(pressProgress < 70 ? "太鬆了，結構散落！" : "結構擠壓變形！");
+                            } else {
+                                let failReason = (pressProgress < minSuccess) ? "填壓密度過低、結構碎裂！" : "過度擠壓破壞植物纖維，內部應力龜裂！";
+                                handlePressFailure(failReason);
+                            }
+                        } else {
+                            if (successStreak >= 3 && !isJoystickMoving && !isJoystickPushing) {
+                                toStep4();
+                            }
                         }
                     }
                     break;
 
-                case 4:
+                case 4: 
                     if (isJoystickPushing) {
-                        hintElement.innerText = "♨️ 烘乾箱運作中，請握緊搖桿維持溫度...";
-                        dryProgress += 1;
+                        showVideo("videos/step4_drying.mp4", true);
+                        factoryVideo.play();
+                        hintElement.innerText = "烘乾箱高溫運作中，請握緊搖桿維持固化溫度...";
+                        dryProgress += 2;
+                        if(dryProgress > 100) dryProgress = 100;
                         loadingBar.style.width = `${dryProgress}%`;
-                        mainMesh.material.color.setHex(0x78350f);
-                        if (dryProgress >= 100) toStep5();
+                        if (dryProgress >= 100) {
+                            factoryVideo.pause(); 
+                            toStep5(); 
+                        }
                     } else {
-                        if (dryProgress > 0) {
-                            dryProgress = 0; loadingBar.style.width = "0%"; hintElement.innerText = "❌ 烘乾中斷！請重新按住！";
+                        factoryVideo.pause();
+                        if (dryProgress > 0) { 
+                            dryProgress = 0; 
+                            loadingBar.style.width = "0%"; 
+                            hintElement.innerText = "烘乾中斷！固化溫度不足，請重新壓住搖桿！"; 
                         }
                     }
                     break;
 
-                case 5:
+                case 5: 
                     if (isBigButtonPressed) {
-                        pressMesh.position.y = 6; mainMesh.position.y = 2; toStep6();
+                        if (isEjectVideoFinished) {
+                            totalPots += 1; 
+                            document.getElementById('pot-count').innerText = totalPots;
+                            toStep6Success(); 
+                        } else {
+                            hintElement.innerText = "模具物理脫模中，請靜候動畫播放完畢...";
+                        }
                     }
                     break;
 
-                case 6:
-                    if (isJoystickClicked) {
-                        mainMesh.material.color.setHex(0x22c55e); totalPots += 1; document.getElementById('pot-count').innerText = totalPots; toStep7Success();
-                    }
-                    break;
+                case 6: 
+                    if (isBigButtonPressed) {
+                        if (!holdResetInterval) {
+                            holdResetInterval = setInterval(() => {
+                                holdResetProgress += 3.33; 
+                                if (holdResetProgress > 100) holdResetProgress = 100;
+                                loadingBar.style.width = `${holdResetProgress}%`;
 
-                case 7:
-                    if (isBigButtonPressed) toStep1();
+                                hintElement.innerText = "正在重製系統中，請持續按住黑色大按鈕...";
+
+                                if (holdResetProgress >= 100) {
+                                    clearInterval(holdResetInterval);
+                                    holdResetInterval = null;
+                                    toStep1(); 
+                                }
+                            }, 50);
+                        }
+                    } else {
+                        if (holdResetInterval) {
+                            clearInterval(holdResetInterval);
+                            holdResetInterval = null;
+                        }
+                        holdResetProgress = 0;
+                        loadingBar.style.width = "0%";
+                        hintElement.innerText = "恭喜你成功壓製出一個精美的 K-Pot 盆器！請長按實體黑色大按鈕重製機台。";
+                    }
                     break;
             }
-        };
+        }
+
+        function showImage(srcPath) {
+            factoryImage.src = srcPath;
+            factoryImage.style.display = "block";
+            factoryVideo.style.display = "none";
+            factoryVideo.pause();
+        }
+
+        function showVideo(srcPath, shouldLoop = true) {
+            if (!factoryVideo.src.includes(srcPath)) {
+                factoryVideo.src = srcPath;
+                factoryVideo.loop = shouldLoop;
+                factoryVideo.load();
+                factoryVideo.pause();
+            }
+            factoryVideo.style.display = "block";
+            factoryImage.style.display = "none";
+        }
 
         function handlePressFailure(reason) {
-            currentStep = 7; successStreak = 0; barWrapper.style.display = "none";
-            pressMesh.position.y = 4; mainMesh.material.color.setHex(0xef4444);
-            hintElement.innerText = `💥 ${reason} 🔴 請拍擊「大按鈕」重新備料。`; titleElement.innerText = "製程失敗！";
+            currentStep = -1; 
+            successStreak = 0; 
+            barWrapper.style.display = "none"; 
+            perfectZone.style.display = "none";
+            showImage("images/step_fail.png"); 
+            titleElement.innerText = "製程失敗！";
+            hintElement.innerText = `${reason} 請拍擊實體黑色大按鈕重新備料。`;
         }
 
-        let isBigButtonHolding = false;
         function toStep1() {
-            currentStep = 1; stirCount = 0; successStreak = 0;
-            titleElement.innerText = "步驟一：材料備料"; hintElement.innerText = "🔴 請拍擊「大按鈕」5 次倒入材料...";
-            mainMesh.position.set(0, 0.5, 0); mainMesh.scale.y = 0.1;
-            mainMesh.material.color.setHex(0xdddddd); pressMesh.position.y = 4; pressMesh.visible = false;
-            barWrapper.style.display = "none"; streakBox.style.display = "none";
+            currentStep = 1; materialCount = 0; successStreak = 0; isEjectVideoFinished = false; holdResetProgress = 0;
+            titleElement.innerText = "步驟一：材料備料";
+            showImage("images/exhibition_cover.png"); 
+            barWrapper.style.display = "none"; streakBox.style.display = "none"; perfectZone.style.display = "none";
+            hintElement.innerText = "請拍擊實體黑色大按鈕 5 次開始依序倒入材料...";
         }
-        function toStep2() { currentStep = 2; stirProgress = 0; titleElement.innerText = "步驟二：手動攪拌"; barWrapper.style.display = "block"; perfectZone.style.display = "none"; }
-        function toStep3() { currentStep = 3; pressProgress = 0; titleElement.innerText = "步驟三：填壓模具 (需連續成功3次)"; hintElement.innerText = "⬇️ 向下推住搖桿！在黃色區域放開！"; pressMesh.visible = true; perfectZone.style.display = "block"; streakBox.style.display = "inline-block"; streakCount.innerText = successStreak; }
-        function toStep4() { currentStep = 4; dryProgress = 0; titleElement.innerText = "步驟四：低溫烘乾箱"; perfectZone.style.display = "none"; }
-        function toStep5() { currentStep = 5; titleElement.innerText = "步驟五：模具脫模出貨"; hintElement.innerText = "🔴 烘乾完成！請拍擊「大按鈕」進行脫模！"; barWrapper.style.display = "none"; }
-        function toStep6() { currentStep = 6; titleElement.innerText = "步驟六：澆水種植"; hintElement.innerText = "🕹️ 請「垂直按下搖桿(BOOT鍵)」為盆器澆水發芽！"; }
-        function toStep7Success() { currentStep = 7; titleElement.innerText = "🎉 盆器培育成功！"; hintElement.innerText = "🔴 請拍擊「大按鈕」開啟下一輪！"; }
+
+        function toStep2() { 
+            currentStep = 2; stirProgress = 0; lastQuadrant = 0;
+            titleElement.innerText = "步驟二：手動攪拌"; 
+            showVideo("videos/step2_stirring.mp4", true); 
+            barWrapper.style.display = "block"; perfectZone.style.display = "none"; loadingBar.style.width = "0%"; 
+            hintElement.innerText = "偵測到攪拌動作！請開始規律轉圈攪拌！";
+        }
+        
+        function toStep3() { 
+            currentStep = 3; pressProgress = 0; 
+            titleElement.innerText = "步驟三：填壓模具 (需連續成功3次)"; 
+            showVideo("videos/step3_pressing.mp4", true); 
+            factoryVideo.play(); 
+            barWrapper.style.display = "block"; streakBox.style.display = "inline-block"; streakCount.innerText = successStreak;
+            perfectZone.style.display = "block"; 
+            loadingBar.style.width = "0%"; 
+            hintElement.innerText = "向下推住搖桿累積壓力！在黃色來回擺動的區域放開！";
+        }
+        
+        function toStep4() { 
+            currentStep = 4; dryProgress = 0; 
+            titleElement.innerText = "步驟四：低溫烘乾箱"; 
+            showVideo("videos/step4_drying.mp4", true);
+            barWrapper.style.display = "block"; perfectZone.style.display = "none"; loadingBar.style.width = "0%"; 
+            hintElement.innerText = "請壓住搖桿啟動高溫烘乾程序..."; 
+        }
+        
+        function toStep5() { 
+            currentStep = 5; isEjectVideoFinished = false; 
+            titleElement.innerText = "步驟五：模具脫模出貨"; 
+            showVideo("videos/step5_eject.mp4", false); 
+            factoryVideo.play(); 
+            barWrapper.style.display = "none"; perfectZone.style.display = "none";
+            hintElement.innerText = "模具正在進行物理脫模，請靜候動畫播放完畢..."; 
+        }
+
+        function toStep6Success() { 
+            currentStep = 6; holdResetProgress = 0;
+            titleElement.innerText = "永續盆器出貨成功"; 
+            showImage("images/step6_product.png"); 
+            barWrapper.style.display = "block"; 
+            loadingBar.style.width = "0%";
+            hintElement.innerText = "恭喜你成功壓製出一個精美的 K-Pot 盆器！請長按實體黑色大按鈕重製機台。"; 
+        }
     </script>
 </body>
 </html>
