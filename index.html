@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>K-Pot 永續工廠 - 展場互動控制台</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
         body { 
             font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; 
@@ -29,6 +32,7 @@
             border-radius: 6px; 
             cursor: pointer; 
             font-weight: bold; 
+            font-size: 14px;
         }
         #game-stage { 
             max-width: 650px; 
@@ -96,6 +100,12 @@
         .hint-text { font-size: 19px; color: #4b5563; font-weight: 600; min-height: 54px; margin: 15px 0; line-height: 1.4; }
         .status-board { font-size: 22px; font-weight: bold; color: #16a34a; margin-top: 15px; }
         .streak-badge { display: inline-block; padding: 6px 18px; background: #dcfce7; color: #15803d; border-radius: 20px; font-size: 16px; margin-left: 12px; border: 1px solid #bcf0da; }
+        
+        /* 🌟 新增：Firebase 雲端流水紀錄的簡約質感樣式 */
+        .history-title { font-size: 18px; color: #8b5a2b; margin-top: 25px; text-align: left; font-weight: bold; border-left: 4px solid #8b5a2b; padding-left: 8px;}
+        #recordList { list-style: none; padding: 0; max-height: 150px; overflow-y: auto; text-align: left; margin-top: 10px; border: 1px solid #e6dfd3; border-radius: 8px; background: #faf8f5;}
+        #recordList li { padding: 8px 12px; border-bottom: 1px solid #f1e9db; font-size: 15px; color: #6b5a50; }
+        #recordList li:last-child { border-bottom: none; background: #fef3c7; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -106,7 +116,7 @@
 
     <div class="connect-box">
         狀態：<span id="connection-status" style="color:#ef4444;">未連線</span> | 
-        控制器 IP：<input type="text" id="ipAddress" value="192.168.1.106">
+        控制器 IP：<input type="text" id="ipAddress" value="192.168.1.103">
         <button onclick="connectESP32()">連接控制器</button>
     </div>
 
@@ -115,7 +125,7 @@
         
         <div id="visual-container">
             <video id="factory-video" muted playsinline></video>
-            <img id="factory-image" src="images/exhibition_cover.png" alt="工廠視覺">
+            <img id="factory-image" src="images/exhibition_cover.png" alt="k-pot展場">
         </div>
 
         <div id="bar-wrapper" class="bar-container">
@@ -129,12 +139,34 @@
             已成功出貨：<span id="pot-count">0</span> 個
             <span id="streak-box" class="streak-badge" style="display:none;">填壓連勝: <span id="streak-count">0</span>/3</span>
         </div>
+
+        <div class="history-title">遠端雲端資料庫即時紀錄：</div>
+        <ul id="recordList">
+            <li>正在同步雲端數據...</li>
+        </ul>
     </div>
 
-    <script {copy}>
+    <script>
+        // ==========================================
+        // 🚨 核心注入：Firebase 帳號配置初始化
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD0jGPf5GS3ccOInDaOSXwvLAT5f3TE1kg",
+            authDomain: "project-5726951723604101503.firebaseapp.com",
+            databaseURL: "https://project-5726951723604101503-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "project-5726951723604101503",
+            storageBucket: "project-5726951723604101503.firebasestorage.app",
+            messagingSenderId: "386031983987",
+            appId: "1:386031983987:web:d91ff38ae0bcbae4c1f906"
+        };
+
+        // 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        let isShippingLocked = false;
         let ws;
         let currentStep = 0; 
-        let totalPots = 0;
+        let totalPots = 0; // 這裡會自動跟隨 Firebase 雲端總筆數連動
         let successStreak = 0; 
         let materialCount = 0;
         let stirProgress = 0;
@@ -173,6 +205,40 @@
         const perfectZone = document.getElementById('perfect-indicator');
         const streakBox = document.getElementById('streak-box');
         const streakCount = document.getElementById('streak-count');
+
+        // ==========================================
+        // 📡 核心注入：網頁啟動即時監聽雲端，重整不消失
+        // ==========================================
+        window.addEventListener('load', function() {
+            database.ref('shipping_records').on('value', (snapshot) => {
+                const data = snapshot.val();
+                const recordList = document.getElementById('recordList');
+                recordList.innerHTML = ""; // 清空舊顯示
+                
+                if (data) {
+                    // 雲端有多少筆歷史資料，出貨總數就維持多少，絕不歸零！
+                    totalPots = Object.keys(data).length; 
+                    
+                    // 依序把歷史紀錄貼在畫面上
+                    Object.values(data).forEach(item => {
+                        let li = document.createElement('li');
+                        li.innerText = item.text;
+                        recordList.appendChild(li);
+                    });
+                    
+                    // 自動把歷史紀錄捲軸捲到最下面，方便看最新的一筆
+                    recordList.scrollTop = recordList.scrollHeight;
+                } else {
+                    totalPots = 0;
+                    let li = document.createElement('li');
+                    li.innerText = "目前尚無出貨紀錄，等待今日第一名觀眾開工！";
+                    recordList.appendChild(li);
+                }
+                
+                // 即時更新網頁原本的計數面版
+                document.getElementById('pot-count').innerText = totalPots;
+            });
+        });
 
         function updateAnimationLoop() {
             if (currentStep === 3) {
@@ -228,11 +294,10 @@
                     }
                     break;
 
-                case 1: // 【1. 備料（防連擊爆圖限制版）】
+                case 1: 
                     if (isBigButtonPressed && !isBigButtonHolding) {
                         isBigButtonHolding = true;
                         
-                        // 🌟 核心修正：如果點擊次數小於圖片總數，就正常切圖更新
                         if (materialCount < 5) {
                             showImage(step1Images[materialCount]);
                             
@@ -244,13 +309,11 @@
                             
                             materialCount += 1;
                         } else {
-                            // 🌟 就算觀眾再怎麼大力連按，文字跟第 5 張照片依然死鎖定格
                             hintElement.innerText = "製程動作 (5/5)：【將天然黏著劑混入花生殼粉中】\n製程準備完畢，請動手轉動搖桿開啟攪拌製程。";
                         }
                     }
                     if (!isBigButtonPressed) isBigButtonHolding = false;
 
-                    // 只要點滿 5 下，且玩家真正推動搖桿，就前進步驟二
                     if (materialCount >= 5 && isJoystickMoving) {
                         toStep2();
                     }
@@ -382,12 +445,23 @@
                     }
                     break;
 
+// 在 script 頂端找得到的地方加這行（如果前面加過 let isShippingLocked = false; 就維持原樣不用動）
+// let isShippingLocked = false; 
+
                 case 5: 
                     if (isBigButtonPressed) {
                         if (isEjectVideoFinished) {
-                            totalPots += 1; 
-                            document.getElementById('pot-count').innerText = totalPots;
-                            toStep6Success(); 
+                            // 🚨 只在真正要出貨的這一刻檢查鎖！
+                            if (!isShippingLocked) { 
+                                isShippingLocked = true; // 立刻鎖上
+
+                                uploadShippingToFirebase(); // 執行出貨（內含 toStep6Success）
+
+                                // 出貨成功切到步驟六了，3 秒後才允許下一次出貨循環，這段時間完全無視大按鈕雜訊
+                                setTimeout(() => { 
+                                    isShippingLocked = false; 
+                                }, 3000); 
+                            }
                         } else {
                             hintElement.innerText = "模具物理脫模中，請靜候動畫播放完畢...";
                         }
@@ -407,21 +481,67 @@
                                 if (holdResetProgress >= 100) {
                                     clearInterval(holdResetInterval);
                                     holdResetInterval = null;
-                                    toStep1(); 
+                                    
+                                    // 🚨 關鍵修改：不要直接執行 toStep1(); 而是先進入「冷卻緩衝狀態」
+                                    currentStep = 999; // 暫時把步驟丟進一個不存在的 999 緩衝區，徹底杜絕任何按鈕雜訊
+                                    holdResetProgress = 0;
+                                    loadingBar.style.width = "0%";
+                                    
+                                    // 畫面上通知觀眾，進入 3 秒倒數
+                                    titleElement.innerText = "系統重製中...";
+                                    hintElement.innerText = "感謝體驗！機台正在復位與清理中，請稍候 3 秒鐘...";
+
+                                    // ⏳ 精準冷卻 3 秒鐘（3000毫秒）後，才高高興興迎接收入下一個循環！
+                                    setTimeout(() => {
+                                        toStep1(); 
+                                    }, 3000);
                                 }
                             }, 50);
                         }
                     } else {
+                        // 如果還沒集滿 100% 就放開，就維持在原本長按放開的復位邏輯
                         if (holdResetInterval) {
                             clearInterval(holdResetInterval);
                             holdResetInterval = null;
                         }
-                        holdResetProgress = 0;
-                        loadingBar.style.width = "0%";
-                        hintElement.innerText = "恭喜你成功壓製出一個精美的 K-Pot 盆器！請長按實體黑色大按鈕重製機台。";
+                        // 🚨 保險防線：只有在真的不是處於 3 秒倒數緩衝（999）的狀態下，放開按鈕才去歸零進度條
+                        if (currentStep === 6) {
+                            holdResetProgress = 0;
+                            loadingBar.style.width = "0%";
+                            hintElement.innerText = "恭喜你成功壓製出一個精美的 K-Pot 盆器！請長按實體黑色大按鈕重製機台。";
+                        }
                     }
                     break;
             }
+        }
+
+        // ==========================================
+        // 🚀 核心注入：抓取當天即時時間並推送到 Firebase
+        // ==========================================
+        function uploadShippingToFirebase() {
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            // 完美符合指定的精準格式： "5/23號 14:30"
+            const formattedTime = `${month}/${date}號 ${hours}:${minutes}`;
+            
+            // 雲端即將產生的下一個總數
+            const nextCount = totalPots + 1;
+            
+            // 拼接最終出貨流水帳字串
+            const recordText = `${formattedTime} 已成功出貨：${nextCount}個`;
+
+            // 推送進雲端 Realtime Database
+            database.ref('shipping_records').push({
+                text: recordText,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                // 雲端推送成功後，才命令網頁切換到 Step6 成功畫面
+                toStep6Success();
+            });
         }
 
         function showImage(srcPath) {
