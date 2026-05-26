@@ -2,8 +2,8 @@
 #include <WebSocketsServer.h>
 
 // 1. Wi-Fi 設定
-const char* ssid     = "293-10F_3";
-const char* password = "86843034";
+const char* ssid     = "*****";
+const char* password = "********";
 
 WebSocketsServer webSocket = WebSocketsServer(81);
 
@@ -13,7 +13,6 @@ const int joystickY = 35;
 const int joystickSW = 32; 
 const int bigButton = 23;  
 
-// 🛠️ 修正後的大頭事件函式（大小寫修正為 WStype_t 與 size_t）
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   if(type == WStype_CONNECTED) { 
     Serial.printf("[%d] 網頁已成功連線！\n", num); 
@@ -25,6 +24,8 @@ void setup() {
   pinMode(joystickX, INPUT);
   pinMode(joystickY, INPUT);
   pinMode(joystickSW, INPUT_PULLUP);
+  
+  // 🛠️ 修正：改為內建上拉電阻，防短路、防干擾
   pinMode(bigButton, INPUT);
 
   WiFi.begin(ssid, password);
@@ -43,6 +44,8 @@ void loop() {
   int xVal = analogRead(joystickX);
   int yVal = analogRead(joystickY);
   int jSW = (digitalRead(joystickSW) == LOW) ? 1 : 0; 
+  
+  // 🛠️ 修正：因為接了 GND，所以讀取到 LOW 才是真的被按下去
   int btnState = (digitalRead(bigButton) == HIGH) ? 1 : 0; 
 
   // 打包成 JSON 字串傳給網頁
